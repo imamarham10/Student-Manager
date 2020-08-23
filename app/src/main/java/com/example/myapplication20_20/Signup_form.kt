@@ -3,7 +3,9 @@ package com.example.myapplication20_20
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.drawable.BitmapDrawable
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
@@ -14,9 +16,14 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.storage.FirebaseStorage
 import kotlinx.android.synthetic.main.activity_signup_form.*
+import java.io.ByteArrayOutputStream
+import java.text.SimpleDateFormat
+import java.util.*
 
 
+@Suppress("DEPRECATION")
 class Signup_form : AppCompatActivity() {
     private var mAuth: FirebaseAuth? = null
     private var database = FirebaseDatabase.getInstance()
@@ -145,6 +152,9 @@ class Signup_form : AppCompatActivity() {
                     //save in database
                     var information = Student(name,username,email,Gender)
                     myRef.child("Users").child(currentuser!!.uid).setValue(information)
+                    //save in storage
+                    SaveToFirebase()
+
                     LoadMain()
                 } else
                 {
@@ -154,6 +164,39 @@ class Signup_form : AppCompatActivity() {
 
                 // ...
             }
+    }
+    fun SaveToFirebase()
+    {
+        var currentuser = mAuth!!.currentUser
+        var email = currentuser!!.email.toString()
+        var Storage = FirebaseStorage.getInstance()
+        var df = SimpleDateFormat("ddMMyyHHmmss")
+        var dataobj = Date()
+        val storageRef = Storage.getReferenceFromUrl("gs://my-application-20-20.appspot.com")
+        val imagePath = Split(email)+"."+df.format(dataobj)+".jpg"
+        val imageRef = storageRef.child("Images/"+ imagePath)
+        ivImagePerson.isDrawingCacheEnabled = true
+        ivImagePerson.buildDrawingCache()
+
+        val drawable = ivImagePerson.drawable as BitmapDrawable
+        val bitmap = drawable.bitmap
+        val baos = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.JPEG,100,baos)
+        val data = baos.toByteArray()
+        val uploadTask = imageRef.putBytes(data)
+        uploadTask.addOnFailureListener{
+            Toast.makeText(applicationContext,"Failed to Upload",Toast.LENGTH_LONG).show()
+        }.addOnSuccessListener{taskSnapshot ->
+            var DownloadURL = taskSnapshot.storage.downloadUrl
+            myRef.child("Users").child(currentuser.uid).child("email").setValue(currentuser.email)
+            myRef.child("Users").child(currentuser.uid).child("ProfileImage").setValue(DownloadURL)
+            Toast.makeText(applicationContext,"Upload Done",Toast.LENGTH_LONG).show()
+        }
+    }
+
+    fun Split(email: String):String{
+        val split = email.split("@")
+        return split[0]
     }
 
     fun  LoadMain(){
